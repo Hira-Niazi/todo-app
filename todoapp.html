@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>To-Do List</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-100 to-gray-300 min-h-screen flex flex-col items-center justify-start pt-12">
+
+    <h1 class="text-4xl font-semibold text-gray-800 mb-8">My To-Do List</h1>
+     <div id="message-box" class="w-full max-w-md mb-4 p-2 text-center text-red-500 font-semibold rounded-md border border-red-500/50 hidden">
+    </div>
+
+    <div class="w-full max-w-md bg-white rounded-xl shadow-lg p-6">
+        <div class="flex items-center mb-4">
+            <input type="text" id="todo-input" placeholder="Add a new task..." class="flex-grow rounded-l-md border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 p-2">
+            <button id="add-button" class="bg-blue-500 hover:bg-blue-600 text-white rounded-r-md p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus-circle"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>
+            </button>
+        </div>
+        <div class="mb-4 flex space-x-2">
+            <button id="filter-all" class="bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-opacity-50">All</button>
+            <button id="filter-active" class="bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-opacity-50">Active</button>
+            <button id="filter-completed" class="bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-opacity-50">Completed</button>
+        </div>
+        <div class="mb-4">
+             <button id="mark-all-completed" class="bg-green-500 hover:bg-green-600 text-white rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 w-full">Mark All Completed</button>
+        </div>
+        <ul id="todo-list" class="space-y-3">
+            </ul>
+    </div>
+
+    <script>
+        const todoInput = document.getElementById('todo-input');
+        const addButton = document.getElementById('add-button');
+        const todoList = document.getElementById('todo-list');
+        const messageBox = document.getElementById('message-box');
+        const filterAllButton = document.getElementById('filter-all');
+        const filterActiveButton = document.getElementById('filter-active');
+        const filterCompletedButton = document.getElementById('filter-completed');
+        const markAllCompletedButton = document.getElementById('mark-all-completed');
+
+        let currentFilter = 'all'; // 'all', 'active', 'completed'
+
+        // Function to add a new task
+        function addTask() {
+            const taskText = todoInput.value.trim();
+
+            if (taskText === '') {
+                showMessage('Please enter a task!');
+                return;
+            }
+
+            hideMessage();
+
+            const listItem = document.createElement('li');
+            listItem.className = "flex items-center justify-between bg-gray-50 p-3 rounded-lg";
+
+            const checkbox = document.createElement('input');
+            checkbox.type = "checkbox";
+            checkbox.className = "mr-2 rounded-md text-blue-500 focus:ring-blue-500 h-5 w-5";
+            checkbox.addEventListener('change', toggleComplete);
+
+            const taskSpan = document.createElement('span');
+            taskSpan.textContent = taskText;
+            taskSpan.className = "flex-grow";
+            taskSpan.addEventListener('click', editTask); // Add click event for editing
+
+            const deleteButton = document.createElement('button');
+            deleteButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x-circle text-gray-400 hover:text-red-500 transition-colors duration-200"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>`;
+            deleteButton.className = "p-1 rounded-full focus:outline-none focus:ring-2 focus:ring-red-500";
+            deleteButton.addEventListener('click', deleteTask);
+
+            const leftContainer = document.createElement('div');
+            leftContainer.className = 'flex items-center';
+            leftContainer.appendChild(checkbox);
+            leftContainer.appendChild(taskSpan);
+
+            listItem.appendChild(leftContainer);
+            listItem.appendChild(deleteButton);
+            todoList.appendChild(listItem);
+
+            // Store the task in localStorage
+            storeTask({ text: taskText, completed: false });
+
+            todoInput.value = ''; // Clear the input
+
+            filterTasks(); // Apply current filter
+        }
+
+        // Function to mark a task as completed/incompleted
+        function toggleComplete(event) {
+            const listItem = event.target.closest('li'); // Find the parent <li>
+             const taskSpan = listItem.querySelector('span');
+            listItem.classList.toggle('completed');
+             if (listItem.classList.contains('completed')) {
+                taskSpan.classList.add('line-through', 'text-gray-400');
+             }else{
+                taskSpan.classList.remove('line-through', 'text-gray-400');
+             }
+
+            // Update the task in localStorage
+            updateTask(listItem, listItem.classList.contains('completed'));
+
+            filterTasks(); // Apply current filter
+        }
+
+        // Function to delete a task
+        function deleteTask(event) {
+            const listItem = event.target.closest('li');  // Find the parent <li>
+            listItem.remove();
+
+            // Delete the task from localStorage
+            deleteTaskFromStorage(listItem);
+        }
+
+        // Function to display a message
+        function showMessage(message) {
+            messageBox.textContent = message;
+            messageBox.classList.remove('hidden');
+        }
+
+        // Function to hide the message
+        function hideMessage() {
+            messageBox.classList.add('hidden');
+            messageBox.textContent = ''; // Clear message
+        }
+
+        // Function to get tasks from localStorage
+        function getTasks() {
+            const tasks = localStorage.getItem('tasks');
+            if (tasks) {
+                return JSON.parse(tasks);
+            } else {
+                return [];
+            }
+        }
+
+        // Function to store a task in localStorage
+        function storeTask(task) {
+            const tasks = getTasks();
+            tasks.push(task);
+            localStorage.setItem('tasks', JSON.stringify(tasks));
+        }
+
+        // Function to update a task in localStorage
+        function updateTask(listItem, completed) {
+            const tasks = getTasks();
+            const taskText = listItem.querySelector('span').textContent;
+            const updatedTasks = tasks.map(task => {
+                if (task.text === taskText) {
+                    return { ...task, completed: completed };
+                }
+                return task;
+            });
+            localStorage.setItem('tasks', JSON.stringify(updatedTasks));
+        }
+
+        // Function to delete a task from localStorage
+        function deleteTaskFromStorage(listItem) {
+             const taskText = listItem.querySelector('span').textContent;
+            const tasks = getTasks().filter(task => task.text !== taskText);
+            localStorage.setItem('tasks', JSON.stringify(tasks));
+        }
+
+        // Function to render the tasks from localStorage
+        function renderTasks() {
+            const tasks = getTasks();
+            todoList.innerHTML = ''; // Clear the list
+            tasks.forEach(task => {
+                const listItem = document.createElement('li');
+                listItem.className = "flex items-center justify-between bg-gray-50 p-3 rounded-lg";
+
+                const checkbox = document.createElement('input');
+                checkbox.type = "checkbox";
+                checkbox.className = "mr-2 rounded-md text-blue-500 focus:ring-blue-500 h-5 w-5";
+                checkbox.checked = task.completed;
+                checkbox.addEventListener('change', toggleComplete);
+
+                const taskSpan = document.createElement('span');
+                taskSpan.textContent = task.text;
+                taskSpan.className = task.completed ? "line-through text-gray-400 flex-grow" : "flex-grow";
+                taskSpan.addEventListener('click', editTask); // Add click event for editing
+
+                const deleteButton = document.createElement('button');
+                deleteButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x-circle text-gray-400 hover:text-red-500 transition-colors duration-200"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>`;
+                deleteButton.className = "p-1 rounded-full focus:outline-none focus:ring-2 focus:ring-red-500";
+                deleteButton.addEventListener('click', deleteTask);
+
+                 const leftContainer = document.createElement('div');
+                leftContainer.className = 'flex items-center';
+                leftContainer.appendChild(checkbox);
+                leftContainer.appendChild(taskSpan);
+
+                listItem.appendChild(leftContainer);
+                listItem.appendChild(deleteButton);
+                todoList.appendChild(listItem);
+            });
+            filterTasks();
+        }
+
+        function filterTasks() {
+            const listItems = todoList.querySelectorAll('li');
+            listItems.forEach(item => {
+                const isCompleted = item.classList.contains('completed');
+                if (currentFilter === 'all') {
+                    item.style.display = '';
+                } else if (currentFilter === 'active') {
+                    item.style.display = isCompleted ? 'none' : '';
+                } else if (currentFilter === 'completed') {
+                    item.style.display = isCompleted ? '' : 'none';
+                }
+            });
+        }
+
+        // Function to edit a task
+        function editTask(event) {
+            const taskSpan = event.target;
+            const listItem = taskSpan.closest('li');
+            const currentText = taskSpan.textContent;
+
+            // Create an input element
+            const input = document.createElement('input');
+            input.type = "text";
+            input.value = currentText;
+            input.className = "flex-grow rounded-md border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 p-2";
+
+            // Replace the span with the input
+            taskSpan.replaceWith(input);
+            input.focus();
+
+            // Add event listener for when the user presses Enter or clicks away
+            input.addEventListener('blur', () => {
+                saveChanges(input, listItem);
+            });
+            input.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    saveChanges(input, listItem);
+                }
+            });
+        }
+
+        function saveChanges(input, listItem) {
+            const newText = input.value.trim();
+             if (newText === '') {
+                showMessage('Task cannot be empty!');
+                 deleteTask( {target: input}); // Pass a fake event
+                return;
+            }
+            const taskSpan = document.createElement('span');
+            taskSpan.textContent = newText;
+            taskSpan.className = "flex-grow";
+            taskSpan.addEventListener('click', editTask);
+
+            input.replaceWith(taskSpan);
+
+            // Update the task text in localStorage
+            updateTaskText(listItem, newText);
+        }
+
+        function updateTaskText(listItem, newText) {
+            const tasks = getTasks();
+            const oldText = listItem.querySelector('span').textContent;
+            const updatedTasks = tasks.map(task => {
+                if (task.text === oldText) {
+                    return { ...task, text: newText };
+                }
+                return task;
+            });
+            localStorage.setItem('tasks', JSON.stringify(updatedTasks));
+        }
+
+        function markAllCompleted() {
+            const listItems = todoList.querySelectorAll('li');
+            listItems.forEach(item => {
+                if (!item.classList.contains('completed')) {
+                    const checkbox = item.querySelector('input[type="checkbox"]');
+                    checkbox.checked = true;
+                    const taskSpan = item.querySelector('span');
+                    item.classList.add('completed');
+                    taskSpan.classList.add('line-through', 'text-gray-400');
+                     // Update the task in localStorage
+                    updateTask(item, true);
+                }
+            });
+            filterTasks();
+        }
+
+        // Event Listeners
+        addButton.addEventListener('click', addTask);
+        todoInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                addTask();
+            }
+        });
+        filterAllButton.addEventListener('click', () => {
+            currentFilter = 'all';
+            filterTasks();
+        });
+        filterActiveButton.addEventListener('click', () => {
+            currentFilter = 'active';
+            filterTasks();
+        });
+        filterCompletedButton.addEventListener('click', () => {
+            currentFilter = 'completed';
+            filterTasks();
+        });
+        markAllCompletedButton.addEventListener('click', markAllCompleted);
+
+        // Initialize the app
+        renderTasks(); // Load and display tasks from localStorage
+    </script>
+</body>
+</html>
